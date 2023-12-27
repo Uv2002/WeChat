@@ -1,0 +1,42 @@
+const express = require('express');
+const nano = require('nano')('http://utsav:xyz2002%@127.0.0.1:5984');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const router = express.Router();
+
+// Connect to CouchDB and create a database
+const dbName = 'users';
+const db = nano.db.use(dbName);
+
+// Endpoint for user authentication
+router.post('/', async (req, res) => {
+    const { user, pwd } = req.body;
+
+    try {
+        // Retrieve the user from CouchDB
+        const doc = await db.get(user);
+        console.log(doc);
+
+        // Check if the password is correct
+        const passwordMatch = await bcrypt.compare(pwd, doc.password);
+
+        if (!passwordMatch) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // Generate JWT token
+        const accessToken = jwt.sign({ username: user, roles: doc.roles }, 'your_secret_key');
+        
+
+        // Send the token and user roles in the response
+        res.json({ accessToken, roles: doc.roles });
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+module.exports = router;
